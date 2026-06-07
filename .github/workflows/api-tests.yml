@@ -1,0 +1,53 @@
+name: API Automation - Newman Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:   # allows manual trigger from GitHub UI
+
+jobs:
+  newman-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the repo
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 3. Install Newman + HTML reporter
+      - name: Install Newman and HTMLExtra Reporter
+        run: |
+          npm install -g newman
+          npm install -g newman-reporter-htmlextra
+
+      # 4. Create reports folder
+      - name: Create Reports Directory
+        run: mkdir -p reports
+
+      # 5. Run Newman with CSV + Environment + HTML report
+      - name: Run Postman Collection
+        run: |
+          newman run collections/your_collection.json \
+            -e environments/your_environment.json \
+            -d testdata/your_data.csv \
+            -r htmlextra,cli \
+            --reporter-htmlextra-export reports/test_report.html \
+            --reporter-htmlextra-title "API Test Report" \
+            --reporter-htmlextra-darkTheme \
+            --suppress-exit-code   # prevents workflow failure on test failures (optional)
+
+      # 6. Upload the HTML report as an artifact
+      - name: Upload HTML Report
+        uses: actions/upload-artifact@v4
+        if: always()   # upload even if tests fail
+        with:
+          name: newman-html-report
+          path: reports/
