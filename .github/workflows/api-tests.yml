@@ -5,49 +5,67 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:   # allows manual trigger from GitHub UI
+
+  workflow_dispatch:          # ← manual trigger with input
+    inputs:
+      environment:
+        description: 'Select Environment to Run'
+        required: true
+        default: 'QA'
+        type: choice
+        options:
+          - QA
+          - STG
 
 jobs:
   newman-run:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the repo
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # 3. Install Newman + HTML reporter
       - name: Install Newman and HTMLExtra Reporter
         run: |
           npm install -g newman
           npm install -g newman-reporter-htmlextra
 
-      # 4. Create reports folder
       - name: Create Reports Directory
         run: mkdir -p reports
 
-      # 5. Run Newman with CSV + Environment + HTML report
+      # Dynamically pick QA or STG secrets based on input
+      - name: Set Environment Variables
+        run: |
+          ENV="${{ github.event.inputs.environment || 'QA' }}"
+          echo "SELECTED_ENV=$ENV" >> $GITHUB_ENV
+
+          if [ "$ENV" = "QA" ]; then
+            echo "BASE_URL=${{ secrets.QA_BASE_URL }}" >> $GITHUB_ENV
+            # Add more QA secrets here...
+          else
+            echo "BASE_URL=${{ secrets.STG_BASE_URL }}" >> $GITHUB_ENV
+            # Add more STG secrets here...
+          fi
+
       - name: Run Postman Collection
         run: |
           newman run collections/your_collection.json \
-            -e environments/your_environment.json \
             -d testdata/your_data.csv \
+            --env-var "base_url=$BASE_URL" \
             -r htmlextra,cli \
             --reporter-htmlextra-export reports/test_report.html \
-            --reporter-htmlextra-title "API Test Report" \
+            --reporter-htmlextra-title "$SELECTED_ENV API Test Report" \
             --reporter-htmlextra-darkTheme \
-            --suppress-exit-code   # prevents workflow failure on test failures (optional)
+            --suppress-exit-code
 
-      # 6. Upload the HTML report as an artifact
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
-        if: always()   # upload even if tests fail
+        if: always()
         with:
-          name: newman-html-report
+          name: newman-report-${{ github.event.inputs.environment || 'QA' }}
           path: reports/
