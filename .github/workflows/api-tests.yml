@@ -54,8 +54,8 @@ jobs:
 
       - name: Run Postman Collection
         run: |
-          newman run collections/your_collection.json \
-            -d testdata/your_data.csv \
+          newman run collections/Library.postman_collection.json \
+            -d testdata/ath.csv \
             --env-var "base_url=$BASE_URL" \
             -r htmlextra,cli \
             --reporter-htmlextra-export reports/test_report.html \
